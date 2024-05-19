@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Comments Cleaner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.7.1/dist/jszip.min.js"></script>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            overflow-y: auto;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Adjust as needed */
+        }
+        .dropdown-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <header>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">YouTube Comments Cleaner</h1>
+        <div class="header-info">
+            <p id="user-info" class="text-lg text-gray-700 hidden"></p>
+            <p id="timer-display" class="text-lg font-semibold text-gray-800">Time: 0.00s</p>
+            <button id="download-button" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline hidden">
+                Download Results
+            </button>
+        </div>
+    </header>
+    <main class="container">
+        <div id="input-area" class="flex-space-between">
+            <input type="text" id="user-name" placeholder="Enter your name" class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <input type="file" id="file-upload" class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <button id="upload-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Upload</button>
+        </div>
+        <div id="content-area" class="mt-4 hidden">
+            <p id="comment-display" class="text-gray-700 text-sm font-bold mb-2">Comment: -</p>
+            <label class="checkbox-inline">
+                <input type="checkbox" id="english-check"> Contains English Words
+            </label>
+            <div class="dropdown-grid">
+                <div>
+                    <label for="sentiment">Sentiment:</label>
+                    <select id="sentiment" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Positive">Positive</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Negative">Negative</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="emotion">Emotion:</label>
+                    <select id="emotion" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Joy">Joy</option>
+                        <option value="Anger">Anger</option>
+                        <option value="Sadness">Sadness</option>
+                        <option value="Surprise">Surprise</option>
+                        <option value="Fear">Fear</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="intent">Intent:</label>
+                    <select id="intent" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Question">Question</option>
+                        <option value="Suggestion">Suggestion</option>
+                        <option value="Criticism">Criticism</option>
+                        <option value="Appreciation">Appreciation</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="toxicity">Toxicity:</label>
+                    <select id="toxicity" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Toxic">Toxic</option>
+                        <option value="Non-Toxic">Non-Toxic</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="sarcasm">Sarcasm:</label>
+                    <select id="sarcasm" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Sarcastic">Sarcastic</option>
+                        <option value="Non-Sarcastic">Non-Sarcastic</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="spam">Spam:</label>
+                    <select id="spam" class="shadow border rounded py-2 px-3 full-width">
+                        <option value="Spam">Spam</option>
+                        <option value="Non-Spam">Non-Spam</option>
+                    </select>
+                </div>
+            </div>
+            <div class="buttons">
+                <button id="previous-button" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Previous
+                </button>
+                <button id="save-and-next-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Save and Next
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let timerInterval;
+            let startTime;
+            let elapsedTime = 0;
+        
+            function initializeUI() {
+                const uploadButton = document.getElementById('upload-button');
+                const downloadButton = document.getElementById('download-button');
+                const previousButton = document.getElementById('previous-button');
+                const nextButton = document.getElementById('save-and-next-button');
+        
+                console.log('Checking button availability:');
+                console.log('Previous Button:', previousButton);
+                console.log('Next Button:', nextButton);
+        
+                if (uploadButton) {
+                    uploadButton.addEventListener('click', handleUpload);
+                } else {
+                    console.error('Upload button not found');
+                }
+        
+                if (downloadButton) {
+                    downloadButton.addEventListener('click', downloadResults);
+                } else {
+                    console.error('Download button not found');
+                }
+        
+                if (previousButton) {
+                    previousButton.addEventListener('click', handlePrevious);
+                } else {
+                    console.error('Previous button not found');
+                }
+        
+                if (nextButton) {
+                    nextButton.addEventListener('click', handleNext);
+                } else {
+                    console.error('Next button not found');
+                }
+            }
+        
+            function handleUpload() {
+                const userName = document.getElementById('user-name').value.trim();
+                const fileInput = document.getElementById('file-upload');
+                if (fileInput && fileInput.files.length > 0 && userName !== "") {
+                    const file = fileInput.files[0];
+                    const fileReader = new FileReader();
+                    fileReader.onload = function(e) {
+                        try {
+                            const comments = JSON.parse(e.target.result);
+                            window.comments = comments.map(comment => ({
+                                content: comment,
+                                containsEnglish: false,
+                                saved: false,
+                                sentiment: "Neutral",
+                                emotion: "Other",
+                                intent: "Question",
+                                toxicity: "Non-Toxic",
+                                sarcasm: "Non-Sarcastic",
+                                spam: "Non-Spam",
+                                timeSpent: 0
+                            }));
+                            window.currentCommentIndex = 0;
+                            displayComment(window.currentCommentIndex);
+                            const userInfo = document.getElementById('user-info');
+                            const inputArea = document.getElementById('input-area');
+                            if (userInfo && inputArea) {
+                                userInfo.textContent = `${userName} - ${file.name}`;
+                                userInfo.classList.remove('hidden');
+                                inputArea.classList.add('hidden');
+                                document.getElementById('download-button').classList.remove('hidden');
+                            }
+                            startTimer();
+                        } catch (error) {
+                            alert('Failed to load JSON file: ' + error.message);
+                        }
+                    };
+                    fileReader.readAsText(file);
+                } else {
+                    alert('Please enter your name and select a file.');
+                }
+            }
+        
+            function handlePrevious() {
+                if (window.currentCommentIndex > 0) {
+                    saveComment();
+                    stopTimer(); // Stop the timer for the current comment
+                    window.currentCommentIndex--;
+                    displayComment(window.currentCommentIndex);
+                    startTimer(); // Restart the timer for the previous comment
+                }
+            }
+
+            function handleNext() {
+                saveComment();
+                stopTimer(); // Stop the timer for the current comment
+                if (window.currentCommentIndex < window.comments.length - 1) {
+                    window.currentCommentIndex++;
+                    displayComment(window.currentCommentIndex);
+                    startTimer(); // Restart the timer for the next comment
+                } else {
+                    alert('No more comments to display.');
+                }
+            }
+
+        
+            // Display the current comment
+            function displayComment(index) {
+                const comment = window.comments[index];
+                document.getElementById('comment-display').textContent = `Comment ${index + 1}: ${comment.content}`;
+                document.getElementById('english-check').checked = comment.containsEnglish;
+                document.getElementById('sentiment').value = comment.sentiment;
+                document.getElementById('emotion').value = comment.emotion;
+                document.getElementById('intent').value = comment.intent;
+                document.getElementById('toxicity').value = comment.toxicity;
+                document.getElementById('sarcasm').value = comment.sarcasm;
+                document.getElementById('spam').value = comment.spam;
+                document.getElementById('content-area').classList.remove('hidden');
+            }
+            
+            function generateMetaInfo() {
+                const userName = document.getElementById('user-name').value.trim();
+                const fileName = document.getElementById('file-upload').files[0].name;
+                const currentDate = new Date();
+                const date = currentDate.toLocaleDateString();
+                const time = currentDate.toLocaleTimeString();
+                const totalTime = window.comments.reduce((total, comment) => total + comment.timeSpent, 0);
+                const averageTime = (totalTime / window.comments.length).toFixed(2);
+                const numberOfSentencesWorked = window.comments.filter(comment => comment.saved).length;
+                const numberOfSentencesLeft = window.comments.length - numberOfSentencesWorked;
+                const cleanedEnglish = window.comments.filter(comment => comment.containsEnglish && comment.saved);
+                const cleanedTelugu = window.comments.filter(comment => !comment.containsEnglish && comment.saved);
+                const completionStatus = numberOfSentencesLeft === 0 ? "Complete" : "Incomplete";
+                const numberOfSentencesInTelugu = cleanedTelugu.length;
+                const numberOfSentencesInEnglish = cleanedEnglish.length;
+
+                return {
+                    username: userName,
+                    filename: fileName,
+                    date: date,
+                    time: time,
+                    totalTime: totalTime.toFixed(2),
+                    averageTime: averageTime,
+                    completionStatus: completionStatus,
+                    numberOfSentencesWorked: numberOfSentencesWorked,
+                    numberOfSentencesLeft: numberOfSentencesLeft,
+                    numberOfSentencesInTelugu: numberOfSentencesInTelugu,
+                    numberOfSentencesInEnglish: numberOfSentencesInEnglish
+                };
+            }
+
+
+            // Save changes to the current comment
+            function saveComment() {
+                const comment = window.comments[window.currentCommentIndex];
+                comment.saved = true;
+                comment.containsEnglish = document.getElementById('english-check').checked;
+                comment.sentiment = document.getElementById('sentiment').value;
+                comment.emotion = document.getElementById('emotion').value;
+                comment.intent = document.getElementById('intent').value;
+                comment.toxicity = document.getElementById('toxicity').value;
+                comment.sarcasm = document.getElementById('sarcasm').value;
+                comment.spam = document.getElementById('spam').value;
+                comment.timeSpent += elapsedTime; // Save the elapsed time
+                elapsedTime = 0; // Reset elapsed time after saving
+            }
+
+            function showMetaInfo(metaInfo) {
+                // Hide all elements except the title bar
+                document.querySelector('main').classList.add('hidden');
+                document.querySelector('.header-info').classList.add('hidden');
+
+                // Create and display the meta-info element
+                const metaInfoDiv = document.createElement('div');
+                metaInfoDiv.classList.add('meta-info');
+                metaInfoDiv.innerHTML = `
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Meta Information</h2>
+                    <p>Username: ${metaInfo.username}</p>
+                    <p>Filename: ${metaInfo.filename}</p>
+                    <p>Date: ${metaInfo.date}</p>
+                    <p>Time: ${metaInfo.time}</p>
+                    <p>Total Time: ${metaInfo.totalTime}</p>
+                    <p>Average Time: ${metaInfo.averageTime}</p>
+                    <p>Completion Status: ${metaInfo.completionStatus}</p>
+                    <p>Number of Sentences Worked: ${metaInfo.numberOfSentencesWorked}</p>
+                    <p>Number of Sentences Left: ${metaInfo.numberOfSentencesLeft}</p>
+                    <p>Number of Sentences in Telugu: ${metaInfo.numberOfSentencesInTelugu}</p>
+                    <p>Number of Sentences in English: ${metaInfo.numberOfSentencesInEnglish}</p>
+                `;
+                document.body.appendChild(metaInfoDiv);
+
+                // Center the meta-info element
+                metaInfoDiv.style.position = 'fixed';
+                metaInfoDiv.style.top = '50%';
+                metaInfoDiv.style.left = '50%';
+                metaInfoDiv.style.transform = 'translate(-50%, -50%)';
+                metaInfoDiv.style.background = 'white';
+                metaInfoDiv.style.padding = '20px';
+                metaInfoDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            }
+
+
+            function downloadResults() {
+                const cleanedEnglish = window.comments.filter(comment => comment.containsEnglish && comment.saved);
+                const cleanedTelugu = window.comments.filter(comment => !comment.containsEnglish && comment.saved);
+                const metaInfo = generateMetaInfo();
+
+                const zip = new JSZip();
+
+                if (cleanedEnglish.length > 0) {
+                    zip.file(`cleaned_english_${document.getElementById('file-upload').files[0].name}.json`, JSON.stringify(cleanedEnglish, null, 2));
+                }
+
+                if (cleanedTelugu.length > 0) {
+                    zip.file(`cleaned_telugu_${document.getElementById('file-upload').files[0].name}.json`, JSON.stringify(cleanedTelugu, null, 2));
+                }
+
+                zip.file(`meta_info_${document.getElementById('file-upload').files[0].name}.json`, JSON.stringify(metaInfo, null, 2));
+
+                if (cleanedEnglish.length === 0 && cleanedTelugu.length === 0) {
+                    alert("No comments have been reviewed and saved. Please review some comments before downloading.");
+                    return;
+                }
+
+                zip.generateAsync({ type: "blob" }).then(function(content) {
+                    const fileName = `cleaned_${document.getElementById('file-upload').files[0].name}.zip`;
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    showMetaInfo(metaInfo);
+                });
+            }
+
+
+        
+            function downloadJSON(data, filename) {
+                // Check if the data is an array (comments) or an object (meta-info)
+                let jsonData;
+                if (Array.isArray(data)) {
+                    jsonData = data.map(comment => ({
+                        content: comment.content,
+                        sentiment: comment.sentiment,
+                        emotion: comment.emotion,
+                        intent: comment.intent,
+                        toxicity: comment.toxicity,
+                        sarcasm: comment.sarcasm,
+                        spam: comment.spam
+                    }));
+                } else {
+                    jsonData = data; // For meta-info, use the data as is
+                }
+
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+
+            // Timer functions for tracking interaction time
+            function startTimer() {
+                startTime = new Date();
+                timerInterval = setInterval(function() {
+                    elapsedTime = ((new Date()) - startTime) / 1000;
+                    document.getElementById('timer-display').textContent = `Time: ${(elapsedTime + window.comments[window.currentCommentIndex].timeSpent).toFixed(2)}s`;
+                }, 100);
+            }
+
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    window.comments[window.currentCommentIndex].timeSpent += elapsedTime;
+                    elapsedTime = 0;
+                }
+            }
+        
+            initializeUI();
+        });
+        </script>
+        
+</body>
+</html>
